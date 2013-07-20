@@ -1,0 +1,41 @@
+
+
+# Object files
+*.o
+
+# Libraries
+*.lib
+*.a
+
+# Shared objects (inc. Windows DLLs)
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# configure generated files
+Makefile
+config.h
+config.log
+config.status
+help/Makefile
+help/doxygen/Makefile
+help/doxygen/doxygen.dox
+include/Makefile
+include/eXosip2/Makefile
+libtool
+platform/Makefile
+platform/vsnet/Makefile
+platform/wince/Makefile
+scripts/Makefile
+src/.deps/
+src/Makefile
+stamp-h1
+tools/.deps/
+tools/Makefile
+
