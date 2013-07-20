@@ -195,6 +195,14 @@ extern "C"
   int eXosip_call_send_answer (int tid, int status, osip_message_t * answer);
 
 /**
+ * Send 200 OK for the pending BYE.
+ * 
+ * @param tid          id of transaction to answer.
+ * @param headers      customs headers to send with the 200 OK.
+ */
+  int eXosip_call_send_closed (int tid,  const osip_list_t * custom_headers);
+
+/**
  * Terminate a call.
  * send CANCEL, BYE or 603 Decline.
  * 
@@ -202,6 +210,16 @@ extern "C"
  * @param did          dialog id of call.
  */
   int eXosip_call_terminate (int cid, int did);
+
+/**
+ * Terminate a call with message.
+ * send CANCEL, BYE or 603 Decline.
+ * 
+ * @param cid          call id of call.
+ * @param did          dialog id of call.
+ */
+  int eXosip_call_terminate_h (int cid, int did, const osip_list_t * custom_headers);
+
 
 /**
  * Build a PRACK for invite.

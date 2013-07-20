@@ -212,8 +212,10 @@ int eXosip_event_init(eXosip_event_t ** je, int type)
 		sprintf((*je)->textinfo, "Timeout. Gave up!");
 	} else if (type == EXOSIP_CALL_REINVITE) {
 		sprintf((*je)->textinfo, "INVITE within call received!");
-	} else if (type == EXOSIP_CALL_CLOSED) {
+	} else if (type == EXOSIP_CALL_CLOSING) {
 		sprintf((*je)->textinfo, "Bye Received!");
+        } else if (type == EXOSIP_CALL_CLOSED) {
+                sprintf((*je)->textinfo, "Bye 200 OK Sent!");
 	} else if (type == EXOSIP_CALL_RELEASED) {
 		sprintf((*je)->textinfo, "Call Context is released!");
 	} else if (type == EXOSIP_REGISTRATION_SUCCESS) {
