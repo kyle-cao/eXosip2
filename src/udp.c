@@ -150,42 +150,26 @@ static void
 eXosip_process_bye(eXosip_call_t * jc, eXosip_dialog_t * jd,
 				   osip_transaction_t * transaction, osip_event_t * evt)
 {
+
 	osip_event_t *evt_answer;
-	osip_message_t *answer;
-	int i;
+        osip_message_t *answer;
+        int i;
 
 #ifndef MINISIZE
-	osip_transaction_set_your_instance(transaction,
-									   __eXosip_new_jinfo(jc, NULL /*jd */ ,
-														  NULL, NULL));
+        osip_transaction_set_your_instance(transaction, __eXosip_new_jinfo(jc, NULL /*jd */ , NULL, NULL));
 #else
-	osip_transaction_set_your_instance(transaction,
-									   __eXosip_new_jinfo(jc, NULL /*jd */ ));
+        osip_transaction_set_your_instance(transaction, __eXosip_new_jinfo(jc, NULL /*jd */ ));
 #endif
 
-	i = _eXosip_build_response_default(&answer, jd->d_dialog, 200, evt->sip);
-	if (i != 0) {
-		osip_list_add(&eXosip.j_transactions, transaction, 0);
-		return;
-	}
-	osip_message_set_content_length(answer, "0");
-
-	evt_answer = osip_new_outgoing_sipmessage(answer);
-	evt_answer->transactionid = transaction->transactionid;
-
+	/* save the transaction in the Dialog incomming transaction */
 	osip_list_add(jd->d_inc_trs, transaction, 0);
 
-	/* Release the eXosip_dialog */
-	osip_dialog_free(jd->d_dialog);
-	jd->d_dialog = NULL;
-
-	osip_transaction_add_event(transaction, evt_answer);
-
-	osip_nist_execute(eXosip.j_osip);
+	/* Generate boths events */
 	report_call_event(EXOSIP_CALL_MESSAGE_NEW, jc, jd, transaction);
-	report_call_event(EXOSIP_CALL_CLOSED, jc, jd, transaction);
-	eXosip_update();			/* AMD 30/09/05 */
+	report_call_event(EXOSIP_CALL_CLOSING, jc, jd, transaction);
 
+	/* Update information of eXosip ? does not seem required, not sure about the necessity, not sure who is AMD and why there is no comment on this */
+	eXosip_update();			/* AMD 30/09/05 */
 	__eXosip_wakeup();
 }
 

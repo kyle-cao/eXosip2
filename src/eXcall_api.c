@@ -709,6 +709,10 @@ eXosip_call_build_notify(int did, int subscription_status,
 
 int eXosip_call_build_answer(int tid, int status, osip_message_t ** answer)
 {
+
+	OSIP_TRACE(osip_trace(__FILE__, __LINE__, OSIP_ERROR, NULL, "eXosip_call_build_answer"));
+
+
 	int i = -1;
 	eXosip_dialog_t *jd = NULL;
 	eXosip_call_t *jc = NULL;
@@ -754,6 +758,66 @@ int eXosip_call_build_answer(int tid, int status, osip_message_t ** answer)
 							  tr->orig_request->sip_method));
 		return i;
 	}
+	return OSIP_SUCCESS;
+}
+
+
+int eXosip_call_send_closed(int tid, const osip_list_t * custom_headers)
+{
+	OSIP_TRACE(osip_trace(__FILE__, __LINE__, OSIP_ERROR, NULL,"eXosip: sending the 'BYE/200 OK' transaction[%i]\n",tid));
+
+	osip_event_t *evt_answer;
+        osip_message_t *answer;
+        int i;
+        eXosip_dialog_t *jd = NULL;
+        eXosip_call_t *jc = NULL;
+        osip_transaction_t *tr = NULL;
+
+	/* RETREIVE TRANSACTION, DIALOG and CALL */
+        if (tid < 0) {
+		OSIP_TRACE(osip_trace(__FILE__, __LINE__, OSIP_ERROR, NULL,"eXosip: bad parameter transaction ID 'BYE/200 OK'\n"));
+                osip_free(custom_headers);
+                return OSIP_BADPARAMETER;
+        }
+        if (tid > 0) {
+		// tid++; // increment the transaction ID because linphone is still handling the INVITE, I do not want to modify this 
+                _eXosip_call_transaction_find(tid, &jc, &jd, &tr);
+        }
+	if (jd == NULL || tr == NULL || tr->orig_request == NULL
+                || tr->orig_request->sip_method == NULL) {
+                OSIP_TRACE(osip_trace(__FILE__, __LINE__, OSIP_ERROR, NULL,"eXosip: No call here or no transaction for call\n"));
+                osip_free(custom_headers);
+                return OSIP_NOTFOUND;
+        }
+
+	/* Build the answer (reply message) */
+	OSIP_TRACE(osip_trace(__FILE__, __LINE__, OSIP_ERROR, NULL,"eXosip: build_response for %s\n",tr->orig_request->sip_method));
+	i = _eXosip_build_response_default(&answer, jd->d_dialog, 200, tr->orig_request);
+	if (i != 0) {
+		OSIP_TRACE(osip_trace(__FILE__, __LINE__, OSIP_ERROR, NULL,"eXosip: build_response error\n"));
+	        return OSIP_ERROR;
+	}
+	osip_message_set_content_length(answer, "0");
+	evt_answer = osip_new_outgoing_sipmessage(answer);
+	evt_answer->transactionid = tr->transactionid;
+	
+	/* Release the eXosip_dialog */
+	osip_dialog_free(jd->d_dialog);
+	jd->d_dialog = NULL;
+
+	/* add the event(answer) to the transation */ 	
+	osip_transaction_add_event(tr, evt_answer);
+
+	/* consume the events of the transaction, (the answer) */
+	i = osip_nist_execute(eXosip.j_osip);
+	if (i!=0)
+		OSIP_TRACE(osip_trace(__FILE__, __LINE__, OSIP_ERROR, NULL,"eXosip: osip_nist_execute error\n"));
+
+	OSIP_TRACE(osip_trace(__FILE__, __LINE__, OSIP_ERROR, NULL,"eXosip: sent the 'BYE/200 OK'\n"));
+
+
+	eXosip_update(); 
+	 __eXosip_wakeup();
 	return OSIP_SUCCESS;
 }
 
@@ -943,6 +1007,138 @@ int eXosip_call_send_answer(int tid, int status, osip_message_t * answer)
 	osip_transaction_add_event(tr, evt_answer);
 	eXosip_update();
 	__eXosip_wakeup();
+	return OSIP_SUCCESS;
+}
+
+int eXosip_call_terminate_h(int cid, int did, const osip_list_t * custom_headers)
+{
+	int i;
+	osip_transaction_t *tr;
+	osip_message_t *request = NULL;
+	eXosip_dialog_t *jd = NULL;
+	eXosip_call_t *jc = NULL;
+
+	if (did <= 0 && cid <= 0)
+		return OSIP_BADPARAMETER;
+	if (did > 0) {
+		eXosip_call_dialog_find(did, &jc, &jd);
+		if (jd == NULL) {
+			OSIP_TRACE(osip_trace
+					   (__FILE__, __LINE__, OSIP_ERROR, NULL,
+						"eXosip: No call here?\n"));
+			return OSIP_NOTFOUND;
+		}
+	} else {
+		eXosip_call_find(cid, &jc);
+	}
+
+	if (jc == NULL) {
+		return OSIP_NOTFOUND;
+	}
+
+	tr = eXosip_find_last_out_invite(jc, jd);
+	if (jd != NULL && jd->d_dialog != NULL
+		&& jd->d_dialog->state == DIALOG_CONFIRMED) {
+		/* don't send CANCEL on re-INVITE: send BYE instead */
+	} else if (tr != NULL && tr->last_response != NULL
+			   && MSG_IS_STATUS_1XX(tr->last_response)) {
+		i = generating_cancel(&request, tr->orig_request);
+		if (i != 0) {
+			OSIP_TRACE(osip_trace
+					   (__FILE__, __LINE__, OSIP_ERROR, NULL,
+						"eXosip: cannot terminate this call!\n"));
+			return i;
+		}
+		i = eXosip_create_cancel_transaction(jc, jd, request);
+		if (i != 0) {
+			OSIP_TRACE(osip_trace
+					   (__FILE__, __LINE__, OSIP_ERROR, NULL,
+						"eXosip: cannot initiate SIP transaction!\n"));
+			return i;
+		}
+		if (jd != NULL) {
+			/*Fix: keep dialog opened after the CANCEL.
+			  osip_dialog_free(jd->d_dialog);
+			  jd->d_dialog = NULL;
+			  eXosip_update(); */
+		}
+		return OSIP_SUCCESS+1;
+	}
+
+	if (jd == NULL || jd->d_dialog == NULL) {
+		OSIP_TRACE(osip_trace
+				   (__FILE__, __LINE__, OSIP_ERROR, NULL,
+					"eXosip: No established dialog!\n"));
+		return OSIP_WRONG_STATE;
+	}
+
+	if (tr == NULL) {
+		/*this may not be enough if it's a re-INVITE! */
+		tr = eXosip_find_last_inc_invite(jc, jd);
+		if (tr != NULL && tr->last_response != NULL && MSG_IS_STATUS_1XX(tr->last_response)) {	/* answer with 603 */
+			osip_generic_param_t *to_tag;
+			osip_from_param_get_byname(tr->orig_request->to, "tag", &to_tag);
+
+			i = eXosip_call_send_answer(tr->transactionid, 603, NULL);
+
+			if (to_tag == NULL)
+				return i;
+		}
+	}
+
+	if (jd->d_dialog == NULL) {
+		OSIP_TRACE(osip_trace
+				   (__FILE__, __LINE__, OSIP_ERROR, NULL,
+					"eXosip: cannot terminate this call!\n"));
+		return OSIP_WRONG_STATE;
+	}
+
+	OSIP_TRACE(osip_trace(__FILE__, __LINE__, OSIP_ERROR, NULL,"eXosip: generating_bye\n"));
+	i = generating_bye(&request, jd->d_dialog, eXosip.transport);
+/*	custom_headers = &request->headers;*/ 
+/* 	request->headers = custom_headers;*/
+/*	osip_header_t * custom_header = NULL; */
+/*	osip_message_get_header(custom_message,0,&custom_header); */
+/*	if(&custom_header != NULL){
+		 OSIP_TRACE(osip_trace(__FILE__, __LINE__, OSIP_ERROR, NULL,"eXosip: custom header found"));
+	}       	
+*/
+	/* constr osip_list_t * custom_headers = &request->headers; */
+
+        osip_header_t * custom_header = NULL;
+	int mcount = osip_list_size(custom_headers);  
+	OSIP_TRACE(osip_trace(__FILE__, __LINE__, OSIP_ERROR, NULL,"eXosip: custom header found x %i",mcount));
+	int it;
+	for(it=0;it<mcount;it++){
+		osip_header_t * custom_header = NULL;
+		custom_header = osip_list_get(custom_headers,it);
+		OSIP_TRACE(osip_trace(__FILE__, __LINE__, OSIP_ERROR, NULL,"eXosip: custom header found [%s|%s]",custom_header->hname,custom_header->hvalue));
+		osip_message_set_header(request,custom_header->hname,custom_header->hvalue);
+	}
+	
+
+/*	osip_message_set_header(request, "test", "2001");*/
+
+	if (i != 0) {
+		OSIP_TRACE(osip_trace
+				   (__FILE__, __LINE__, OSIP_ERROR, NULL,
+					"eXosip: cannot terminate this call!\n"));
+		return i;
+	}
+
+	eXosip_add_authentication_information(request, NULL);
+
+	i = eXosip_create_transaction(jc, jd, request);
+	if (i != 0) {
+		OSIP_TRACE(osip_trace
+				   (__FILE__, __LINE__, OSIP_ERROR, NULL,
+					"eXosip: cannot initiate SIP transaction!\n"));
+		return i;
+	}
+
+	osip_dialog_free(jd->d_dialog);
+	jd->d_dialog = NULL;
+	eXosip_update();			/* AMD 30/09/05 */
 	return OSIP_SUCCESS;
 }
 

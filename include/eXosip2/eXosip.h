@@ -291,7 +291,8 @@ extern "C"
     EXOSIP_CALL_MESSAGE_SERVERFAILURE,    /**< announce a failure. */
     EXOSIP_CALL_MESSAGE_GLOBALFAILURE,    /**< announce a failure. */
 
-    EXOSIP_CALL_CLOSED,            /**< a BYE was received for this call      */
+    EXOSIP_CALL_CLOSING,            /**< a BYE was received for this call      */
+    EXOSIP_CALL_CLOSED,            /**< a 200OK was sent in response to a BYE  */
 
     /* for both UAS & UAC events */
     EXOSIP_CALL_RELEASED,             /**< call context is cleared.            */
