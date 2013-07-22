@@ -780,7 +780,6 @@ int eXosip_call_send_closed(int tid, const osip_list_t * custom_headers)
                 return OSIP_BADPARAMETER;
         }
         if (tid > 0) {
-		// tid++; // increment the transaction ID because linphone is still handling the INVITE, I do not want to modify this 
                 _eXosip_call_transaction_find(tid, &jc, &jd, &tr);
         }
 	if (jd == NULL || tr == NULL || tr->orig_request == NULL
@@ -798,6 +797,22 @@ int eXosip_call_send_closed(int tid, const osip_list_t * custom_headers)
 	        return OSIP_ERROR;
 	}
 	osip_message_set_content_length(answer, "0");
+
+	/* adding custom headers */
+        osip_header_t * custom_header = NULL;
+        int mcount = osip_list_size(custom_headers);
+        OSIP_TRACE(osip_trace(__FILE__, __LINE__, OSIP_ERROR, NULL,"eXosip: custom header found x %i",mcount));
+        int it;
+        for(it=0;it<mcount;it++){
+                osip_header_t * custom_header = NULL;
+                custom_header = osip_list_get(custom_headers,it);
+                OSIP_TRACE(osip_trace(__FILE__, __LINE__, OSIP_ERROR, NULL,"eXosip: custom header found [%s|%s]",custom_header->hname,custom_header->hvalue));
+                osip_message_set_header(answer,custom_header->hname,custom_header->hvalue);
+        }
+
+
+
+ 	/* set message */
 	evt_answer = osip_new_outgoing_sipmessage(answer);
 	evt_answer->transactionid = tr->transactionid;
 	
