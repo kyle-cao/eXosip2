@@ -764,7 +764,7 @@ int eXosip_call_build_answer(int tid, int status, osip_message_t ** answer)
 
 int eXosip_call_send_closed(int tid, const osip_list_t * custom_headers)
 {
-	OSIP_TRACE(osip_trace(__FILE__, __LINE__, OSIP_ERROR, NULL,"eXosip: sending the 'BYE/200 OK' transaction[%i]\n",tid));
+	OSIP_TRACE(osip_trace(__FILE__, __LINE__, OSIP_ERROR, NULL,"eXosip: sending the 'BYE/200 OK' transaction[%i]@\n",tid));
 
 	osip_event_t *evt_answer;
         osip_message_t *answer;
